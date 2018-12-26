@@ -62,6 +62,8 @@ private:
 private:
 	HWND m_hWnd;
 	ID2D1Factory *m_pDirect2dFactory;
+	IDWriteFactory *m_pDirectWFactory;
+	IDWriteTextFormat *m_pWriteTextFormat;
 	ID2D1HwndRenderTarget *m_pRenderTarget;
 	ID2D1SolidColorBrush *m_pLightSlateGrayBrush;
 	ID2D1SolidColorBrush *m_pCornflowerBlueBrush;

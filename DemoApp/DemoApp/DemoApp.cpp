@@ -33,6 +33,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 DemoApp::DemoApp()
 	: m_hWnd(nullptr)
 	, m_pDirect2dFactory(nullptr)
+	, m_pDirectWFactory(nullptr)
+	, m_pWriteTextFormat(nullptr)
 	, m_pRenderTarget(nullptr)
 	, m_pLightSlateGrayBrush(nullptr)
 	, m_pCornflowerBlueBrush(nullptr)
@@ -43,6 +45,8 @@ DemoApp::DemoApp()
 DemoApp::~DemoApp()
 {
 	SafeRelease(&m_pDirect2dFactory);
+	SafeRelease(&m_pDirectWFactory);
+	SafeRelease(&m_pWriteTextFormat);
 	SafeRelease(&m_pRenderTarget);
 	SafeRelease(&m_pLightSlateGrayBrush);
 	SafeRelease(&m_pCornflowerBlueBrush);
@@ -103,6 +107,23 @@ HRESULT DemoApp::CreateDeviceIndependentResources()
 {
 
 	HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pDirect2dFactory);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&m_pDirectWFactory));
+	if (FAILED(hr))
+		return hr;
+
+	hr = m_pDirectWFactory->CreateTextFormat(L"Microsoft YaHei UI",
+		nullptr,
+		DWRITE_FONT_WEIGHT_REGULAR,
+		DWRITE_FONT_STYLE_NORMAL,
+		DWRITE_FONT_STRETCH_NORMAL, 50.0f, L"zh-cn", &m_pWriteTextFormat);
+	if (FAILED(hr))
+		return hr;
+
 	return hr;
 }
 
@@ -183,7 +204,34 @@ HRESULT DemoApp::OnRender()
 			rtSize.height / 2 + 100.0f);
 
 		//m_pRenderTarget->FillRectangle(&rectangle1, m_pLightSlateGrayBrush);
+
+		//绘制矩形
 		m_pRenderTarget->FillRectangle(&rectangle2, m_pCornflowerBlueBrush);
+
+		// 绘制圆角矩形
+		/*D2D1_ROUNDED_RECT rc;
+		rc.rect = rectangle2;
+		rc.radiusX = 30;
+		rc.radiusY = 30;
+		m_pRenderTarget->DrawRoundedRectangle(rc, m_pCornflowerBlueBrush);*/
+
+		// 绘制椭圆
+		/*D2D1_ELLIPSE ellipse = D2D1::Ellipse(D2D1::Point2F(100.0f, 100.0f), 50, 50);
+		m_pRenderTarget->FillEllipse(ellipse, m_pCornflowerBlueBrush);*/
+
+
+		// 绘制文字
+		RECT rc;
+		GetClientRect(m_hWnd, &rc);
+		D2D1_RECT_F textLayoutRect = D2D1::RectF(
+			static_cast<FLOAT>(rc.left),
+			static_cast<FLOAT>(rc.top),
+			static_cast<FLOAT>(rc.right - rc.left),
+			static_cast<FLOAT>(rc.bottom - rc.top)
+		);
+		WCHAR tsz[100] = L"wenxinzhou";
+		m_pRenderTarget->DrawTextW(tsz, 100, m_pWriteTextFormat, textLayoutRect,
+			m_pCornflowerBlueBrush);
 
 		hr = m_pRenderTarget->EndDraw();
 	}
