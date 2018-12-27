@@ -34,6 +34,7 @@ DemoApp::DemoApp()
 	: m_hWnd(nullptr)
 	, m_pDirect2dFactory(nullptr)
 	, m_pDirectWFactory(nullptr)
+	, m_pWICImagingFactory(nullptr)
 	, m_pWriteTextFormat(nullptr)
 	, m_pRenderTarget(nullptr)
 	, m_pLightSlateGrayBrush(nullptr)
@@ -46,6 +47,7 @@ DemoApp::~DemoApp()
 {
 	SafeRelease(&m_pDirect2dFactory);
 	SafeRelease(&m_pDirectWFactory);
+	SafeRelease(&m_pWICImagingFactory);
 	SafeRelease(&m_pWriteTextFormat);
 	SafeRelease(&m_pRenderTarget);
 	SafeRelease(&m_pLightSlateGrayBrush);
@@ -124,6 +126,10 @@ HRESULT DemoApp::CreateDeviceIndependentResources()
 	if (FAILED(hr))
 		return hr;
 
+	hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_pWICImagingFactory));
+	if (FAILED(hr))
+		return hr;
+
 	return hr;
 }
 
@@ -162,6 +168,82 @@ void DemoApp::DiscardDeviceResources()
 	SafeRelease(&m_pRenderTarget);
 	SafeRelease(&m_pLightSlateGrayBrush);
 	SafeRelease(&m_pCornflowerBlueBrush);
+}
+
+HRESULT DemoApp::LoadBitmapFromFile(ID2D1RenderTarget *pRenderTarget, IWICImagingFactory *pIWICFactory, PCWSTR uri, UINT destinationWidth, UINT destinationHeight, ID2D1Bitmap **ppBitmap)
+{
+	HRESULT hr = S_FALSE;
+
+	IWICBitmapDecoder *pBitmapDecoder = NULL;
+	IWICBitmapFrameDecode *pBitmapFrame = NULL;
+	IWICFormatConverter *pConvert = NULL;
+	IWICBitmapScaler *pScaler = nullptr;
+
+	hr = pIWICFactory->CreateDecoderFromFilename(uri,
+		nullptr,
+		GENERIC_READ,
+		WICDecodeMetadataCacheOnLoad, &pBitmapDecoder);
+
+	if (FAILED(hr))
+		goto cleanup;
+
+	hr = pBitmapDecoder->GetFrame(0, &pBitmapFrame);
+	if (FAILED(hr))
+		goto cleanup;
+
+	hr = pIWICFactory->CreateFormatConverter(&pConvert);
+	if (FAILED(hr))
+		goto cleanup;
+
+	if (destinationWidth != 0 || destinationHeight != 0)
+	{
+		UINT originalWidth, originalHeight;
+		hr = pBitmapFrame->GetSize(&originalWidth, &originalHeight);
+		if (FAILED(hr))
+			goto cleanup;
+
+		if (destinationWidth == 0)
+		{
+			FLOAT scalar = static_cast<FLOAT>(destinationHeight) / static_cast<FLOAT>(originalHeight);
+			destinationWidth = static_cast<UINT>(scalar * static_cast<FLOAT>(originalWidth));
+		}
+		else if (destinationHeight == 0)
+		{
+			FLOAT scalar = static_cast<FLOAT>(destinationWidth) / static_cast<FLOAT>(originalWidth);
+			destinationHeight = static_cast<UINT>(scalar * static_cast<FLOAT>(originalHeight));
+		}
+
+		hr = pIWICFactory->CreateBitmapScaler(&pScaler);
+		if (SUCCEEDED(hr))
+		{
+			hr = pScaler->Initialize(pBitmapFrame, destinationWidth,
+				destinationHeight, WICBitmapInterpolationModeCubic);
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			hr = pConvert->Initialize(pScaler,
+				GUID_WICPixelFormat32bppPRGBA,
+				WICBitmapDitherTypeNone,
+				NULL,
+				0.0f,
+				WICBitmapPaletteTypeMedianCut);
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			hr = pRenderTarget->CreateBitmapFromWicBitmap(pConvert,
+				NULL, ppBitmap);
+		}
+	}
+
+cleanup:
+	SafeRelease(&pBitmapDecoder);
+	SafeRelease(&pBitmapFrame);
+	SafeRelease(&pConvert);
+	SafeRelease(&pScaler);
+
+	return hr;
 }
 
 HRESULT DemoApp::OnRender()
@@ -221,7 +303,7 @@ HRESULT DemoApp::OnRender()
 
 
 		// »æÖÆÎÄ×Ö
-		RECT rc;
+		/*RECT rc;
 		GetClientRect(m_hWnd, &rc);
 		D2D1_RECT_F textLayoutRect = D2D1::RectF(
 			static_cast<FLOAT>(rc.left),
@@ -231,7 +313,26 @@ HRESULT DemoApp::OnRender()
 		);
 		WCHAR tsz[100] = L"wenxinzhou";
 		m_pRenderTarget->DrawTextW(tsz, 100, m_pWriteTextFormat, textLayoutRect,
-			m_pCornflowerBlueBrush);
+			m_pCornflowerBlueBrush);*/
+
+		// »æÖÆÍ¼Æ¬
+		RECT rc;
+		GetClientRect(m_hWnd, &rc);
+		D2D1_RECT_F imageLayoutRect = D2D1::RectF(
+			static_cast<FLOAT>(rc.left),
+			static_cast<FLOAT>(rc.top),
+			static_cast<FLOAT>(rc.right - rc.left),
+			static_cast<FLOAT>(rc.bottom - rc.top)
+		);
+
+		ID2D1Bitmap *pBitmap = nullptr;
+		if (LoadBitmapFromFile(m_pRenderTarget, m_pWICImagingFactory, L"D:\\123.png", imageLayoutRect.right - imageLayoutRect.left,
+			imageLayoutRect.bottom - imageLayoutRect.top, &pBitmap) == S_OK)
+		{
+			m_pRenderTarget->DrawBitmap(pBitmap, imageLayoutRect);
+
+			SafeRelease(&pBitmap);
+		}
 
 		hr = m_pRenderTarget->EndDraw();
 	}

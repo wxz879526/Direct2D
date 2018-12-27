@@ -53,6 +53,15 @@ private:
 
 	void DiscardDeviceResources();
 
+	HRESULT LoadBitmapFromFile(
+		ID2D1RenderTarget *pRenderTarget,
+		IWICImagingFactory *pIWICFactory,
+		PCWSTR uri,
+		UINT destinationWidth,
+		UINT destinationHeight,
+		ID2D1Bitmap **ppBitmap
+	);
+
 	HRESULT  OnRender();
 
 	void OnResize(UINT width, UINT height);
@@ -63,6 +72,7 @@ private:
 	HWND m_hWnd;
 	ID2D1Factory *m_pDirect2dFactory;
 	IDWriteFactory *m_pDirectWFactory;
+	IWICImagingFactory *m_pWICImagingFactory;
 	IDWriteTextFormat *m_pWriteTextFormat;
 	ID2D1HwndRenderTarget *m_pRenderTarget;
 	ID2D1SolidColorBrush *m_pLightSlateGrayBrush;
